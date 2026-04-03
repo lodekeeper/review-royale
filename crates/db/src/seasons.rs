@@ -170,7 +170,7 @@ pub async fn get_season_leaderboard(
             JOIN users u ON u.id = r.reviewer_id
             WHERE r.submitted_at >= $1 AND r.submitted_at < $2
               AND ($3::uuid IS NULL OR pr.repo_id = $3)
-              AND u.login NOT LIKE '%[bot]'
+              AND u.login NOT LIKE '%[bot]' AND u.login NOT IN ('Copilot', 'lodekeeper', 'lodekeeper-z')
             ORDER BY r.pr_id, r.submitted_at ASC
         ),
         user_stats AS (
@@ -186,7 +186,7 @@ pub async fn get_season_leaderboard(
                 AND r.submitted_at >= $1 AND r.submitted_at < $2
             LEFT JOIN pull_requests pr ON pr.id = r.pr_id
             WHERE ($3::uuid IS NULL OR pr.repo_id = $3)
-              AND u.login NOT LIKE '%[bot]'
+              AND u.login NOT LIKE '%[bot]' AND u.login NOT IN ('Copilot', 'lodekeeper', 'lodekeeper-z')
             GROUP BY u.id
             HAVING COUNT(r.id) > 0
         )
@@ -201,7 +201,7 @@ pub async fn get_season_leaderboard(
             us.period_xp
         FROM users u
         JOIN user_stats us ON us.id = u.id
-        WHERE u.login NOT LIKE '%[bot]'
+        WHERE u.login NOT LIKE '%[bot]' AND u.login NOT IN ('Copilot', 'lodekeeper', 'lodekeeper-z')
         ORDER BY us.period_xp DESC, us.reviews_given DESC
         LIMIT $4
         "#,

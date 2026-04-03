@@ -163,7 +163,7 @@ pub async fn get_team_leaderboard(
             LEFT JOIN users u ON u.id = tm.user_id
             LEFT JOIN reviews r ON r.reviewer_id = u.id AND r.submitted_at >= $1
             LEFT JOIN pull_requests pr ON pr.id = r.pr_id
-            WHERE u.login NOT LIKE '%[bot]' OR u.id IS NULL
+            WHERE ((u.login NOT LIKE '%[bot]' AND u.login NOT IN ('Copilot', 'lodekeeper', 'lodekeeper-z')) OR u.id IS NULL)
               AND ($2::uuid IS NULL OR pr.repo_id = $2 OR r.id IS NULL)
             GROUP BY t.id, t.name, t.description, t.color, t.created_at
         )
