@@ -248,6 +248,13 @@
                 <div id="xp-breakdown" class="bg-black/20 rounded-xl p-4 space-y-2 text-sm"></div>
             </div>
 
+            <div id="categories-section" class="mb-8">
+                <h3 class="text-lg font-semibold mb-4">🎯 Review Style</h3>
+                <div id="categories-breakdown" class="bg-black/20 rounded-xl p-4">
+                    <div class="text-center text-gray-500 py-4">Loading...</div>
+                </div>
+            </div>
+
             <div id="achievements-section" class="mb-8">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold">🏆 Achievements</h3>
@@ -971,6 +978,7 @@
 
         async function loadActivityChart(username) {
             try {
+                loadCategoryBreakdown(username);
                 const response = await fetch(`${getUserApiBase(username)}/activity`);
                 let labels = [], reviewData = [], xpData = [];
                 
@@ -1413,6 +1421,62 @@
                 }
             } else {
                 upNextSection.classList.add('hidden');
+            }
+        }
+
+        const categoryConfig = {
+            logic: { icon: '🐛', color: 'text-red-400', bg: 'bg-red-400/10', label: 'Logic / Bug Catches' },
+            structural: { icon: '🏗️', color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Structural / Design' },
+            nit: { icon: '✏️', color: 'text-yellow-400', bg: 'bg-yellow-400/10', label: 'Nits' },
+            question: { icon: '❓', color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Questions' },
+            cosmetic: { icon: '🎨', color: 'text-pink-400', bg: 'bg-pink-400/10', label: 'Cosmetic' },
+            critical: { icon: '🚨', color: 'text-red-500', bg: 'bg-red-500/10', label: 'Critical' },
+            performance: { icon: '⚡', color: 'text-orange-400', bg: 'bg-orange-400/10', label: 'Performance' },
+            security: { icon: '🔒', color: 'text-green-400', bg: 'bg-green-400/10', label: 'Security' },
+            other: { icon: '📝', color: 'text-gray-400', bg: 'bg-gray-400/10', label: 'Other' },
+        };
+
+        async function loadCategoryBreakdown(username) {
+            const container = document.getElementById('categories-breakdown');
+            try {
+                const response = await fetch(`${getUserApiBase(username)}/categories`);
+                if (!response.ok) throw new Error('Failed');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="text-center text-gray-500 py-4">No categorized comments yet</div>';
+                    return;
+                }
+
+                const total = data.reduce((s, d) => s + d.count, 0);
+                
+                // Stacked bar
+                const barHtml = `<div class="flex rounded-full overflow-hidden h-4 mb-4">${data.map(d => {
+                    const cfg = categoryConfig[d.category] || categoryConfig.other;
+                    const width = (d.count / total * 100).toFixed(1);
+                    return `<div class="${cfg.bg} border-r border-black/20" style="width:${width}%" title="${cfg.label}: ${d.count} (${width}%)"></div>`;
+                }).join('')}</div>`;
+
+                // Legend with quality scores
+                const legendHtml = data.map(d => {
+                    const cfg = categoryConfig[d.category] || categoryConfig.other;
+                    const qualityStars = d.avg_quality >= 7 ? '🔥' : d.avg_quality >= 5 ? '⭐' : '';
+                    return `
+                        <div class="flex items-center justify-between py-1.5">
+                            <div class="flex items-center gap-2">
+                                <span>${cfg.icon}</span>
+                                <span class="${cfg.color} text-sm font-medium">${cfg.label}</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs text-gray-500">${d.count} comments (${d.percentage}%)</span>
+                                <span class="text-xs ${cfg.color}" title="Avg quality: ${d.avg_quality}/10">avg ${d.avg_quality} ${qualityStars}</span>
+                            </div>
+                        </div>`;
+                }).join('');
+
+                container.innerHTML = barHtml + '<div class="space-y-0.5">' + legendHtml + '</div>';
+            } catch (e) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-4">Review style data unavailable</div>';
             }
         }
 

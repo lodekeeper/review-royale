@@ -285,3 +285,42 @@ pub async fn repo_reviews(
             .collect(),
     ))
 }
+
+/// Category breakdown for a user's review comments
+pub async fn category_breakdown(
+    State(state): State<Arc<AppState>>,
+    Path(username): Path<String>,
+) -> ApiResult<Json<Vec<db::users::CategoryBreakdown>>> {
+    let user = db::users::get_by_login(&state.pool, &username)
+        .await
+        .db_err()?
+        .not_found(format!("User '{}' not found", username))?;
+
+    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, None)
+        .await
+        .db_err()?;
+
+    Ok(Json(breakdown))
+}
+
+/// Category breakdown for a user's review comments (repo-scoped)
+pub async fn repo_category_breakdown(
+    State(state): State<Arc<AppState>>,
+    Path((owner, name, username)): Path<(String, String, String)>,
+) -> ApiResult<Json<Vec<db::users::CategoryBreakdown>>> {
+    let repo = db::repos::get_by_name(&state.pool, &owner, &name)
+        .await
+        .db_err()?
+        .not_found(format!("Repository {}/{} not found", owner, name))?;
+
+    let user = db::users::get_by_login(&state.pool, &username)
+        .await
+        .db_err()?
+        .not_found(format!("User '{}' not found", username))?;
+
+    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, Some(repo.id))
+        .await
+        .db_err()?;
+
+    Ok(Json(breakdown))
+}
