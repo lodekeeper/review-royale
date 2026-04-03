@@ -1204,33 +1204,26 @@
         }
 
         function renderRepoNav() {
-            const header = document.querySelector('#leaderboard-view header');
-            // Remove existing nav if any
-            const existingNav = document.getElementById('repo-nav');
-            if (existingNav) existingNav.remove();
+            const container = document.getElementById('repo-selector');
+            if (!container) return;
             
-            if (availableRepos.length <= 1) return; // No nav needed for single repo
-            
-            const nav = document.createElement('div');
-            nav.id = 'repo-nav';
-            nav.className = 'flex flex-wrap justify-center gap-2 mt-4';
-            
-            // Global tab
-            const globalActive = !currentRepo;
-            nav.innerHTML = `
-                <a href="/" class="px-4 py-2 rounded-full text-sm font-medium transition-all ${globalActive ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'} border">🌍 All Repos</a>
-                ${availableRepos.map(repo => {
-                    const active = currentRepo && currentRepo.owner === repo.owner && currentRepo.name === repo.name;
-                    return `<a href="/${repo.owner}/${repo.name}" class="px-4 py-2 rounded-full text-sm font-medium transition-all ${active ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'} border">${repo.name}</a>`;
-                }).join('')}
-            `;
-            
-            // Insert after the back-to-home link or subtitle
-            const backLink = header.querySelector('a[href="/"]');
-            if (backLink) {
-                backLink.remove(); // Remove "Back to Home" link since we have tabs now
+            if (availableRepos.length <= 1) {
+                container.classList.add('hidden');
+                container.innerHTML = '';
+                return;
             }
-            header.appendChild(nav);
+            
+            const globalActive = !currentRepo;
+            container.classList.remove('hidden');
+            container.innerHTML = `
+                <div id="repo-nav" class="flex flex-wrap justify-center gap-2 mt-4">
+                    <a href="/" class="px-4 py-2 rounded-full text-sm font-medium transition-all border ${globalActive ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'}">🌍 All Repos</a>
+                    ${availableRepos.map(repo => {
+                        const active = currentRepo && currentRepo.owner === repo.owner && currentRepo.name === repo.name;
+                        return `<a href="/${repo.owner}/${repo.name}" class="px-4 py-2 rounded-full text-sm font-medium transition-all border ${active ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'}">${repo.name}</a>`;
+                    }).join('')}
+                </div>
+            `;
         }
 
         function renderLandingRepos() {
