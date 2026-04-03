@@ -89,15 +89,6 @@
         </div>
 
         <div class="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-8 mb-8">
-            <a href="/global" class="block p-5 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border border-purple-500/30 transition-all mb-8">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="font-bold text-lg text-white">🌍 Global Leaderboard</div>
-                        <div class="text-sm text-gray-400">Combined rankings across all repositories</div>
-                    </div>
-                    <div class="text-purple-400 font-semibold">View →</div>
-                </div>
-            </a>
             <h2 class="text-2xl font-bold mb-4">📦 Tracked Repositories</h2>
             <div id="landing-repos" class="space-y-3">
                 <div class="text-gray-500">Loading repositories...</div>
@@ -505,7 +496,7 @@
         }
 
         function getLeaderboardUrl() {
-            if (!currentRepo && window.location.pathname.startsWith('/global')) return '/global';
+            if (!currentRepo) return '/';
             if (currentRepo) {
                 return `/${currentRepo.owner}/${currentRepo.name}`;
             }
@@ -919,7 +910,7 @@
             const backText = document.getElementById('back-button-text');
             backText.textContent = currentRepo 
                 ? `Back to ${currentRepo.owner}/${currentRepo.name}` 
-                : (window.location.pathname.startsWith('/global') ? 'Back to Global Leaderboard' : 'Back to Leaderboard');
+                : 'Back to Global Leaderboard';
 
             // Find user in leaderboard data first
             const entry = leaderboardData.find(e => e.user.login === username);
@@ -1182,7 +1173,7 @@
             if (currentRepo) {
                 subtitle.innerHTML = `<a href="https://github.com/${currentRepo.owner}/${currentRepo.name}" target="_blank" class="text-purple-400 hover:text-purple-300">${currentRepo.owner}/${currentRepo.name}</a> leaderboard`;
             } else {
-                subtitle.textContent = window.location.pathname.startsWith("/global") ? "Global leaderboard — all repositories combined" : "The ultimate PR review leaderboard";
+                subtitle.textContent = !currentRepo ? "All repositories combined" : "The ultimate PR review leaderboard";
             }
         }
 
@@ -1212,6 +1203,36 @@
         function hideLanding() {
             document.getElementById('landing-view').classList.add('hidden');
             document.getElementById('leaderboard-view').classList.remove('hidden');
+        }
+
+        function renderRepoNav() {
+            const header = document.querySelector('#leaderboard-view header');
+            // Remove existing nav if any
+            const existingNav = document.getElementById('repo-nav');
+            if (existingNav) existingNav.remove();
+            
+            if (availableRepos.length <= 1) return; // No nav needed for single repo
+            
+            const nav = document.createElement('div');
+            nav.id = 'repo-nav';
+            nav.className = 'flex flex-wrap justify-center gap-2 mt-4';
+            
+            // Global tab
+            const globalActive = !currentRepo;
+            nav.innerHTML = `
+                <a href="/" class="px-4 py-2 rounded-full text-sm font-medium transition-all ${globalActive ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'} border">🌍 All Repos</a>
+                ${availableRepos.map(repo => {
+                    const active = currentRepo && currentRepo.owner === repo.owner && currentRepo.name === repo.name;
+                    return `<a href="/${repo.owner}/${repo.name}" class="px-4 py-2 rounded-full text-sm font-medium transition-all ${active ? 'bg-purple-600 border-purple-500 text-white' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-400'} border">${repo.name}</a>`;
+                }).join('')}
+            `;
+            
+            // Insert after the back-to-home link or subtitle
+            const backLink = header.querySelector('a[href="/"]');
+            if (backLink) {
+                backLink.remove(); // Remove "Back to Home" link since we have tabs now
+            }
+            header.appendChild(nav);
         }
 
         function renderLandingRepos() {
@@ -1446,7 +1467,7 @@
                 }
                 currentRepo = { owner: urlInfo.owner, name: urlInfo.name };
                 updateSubtitle();
-                renderRepoSelector();
+                renderRepoNav();
             }
             
             if (urlInfo.user) {
