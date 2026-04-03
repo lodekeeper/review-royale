@@ -376,15 +376,8 @@
         // Allowed orgs for public access
         const ALLOWED_ORGS = ['sigp', 'ethereum', 'chainsafe', 'offchainlabs'];
 
-        // Pre-filled tweet for requesting access
-        function getTweetUrl(org) {
-            const text = `@dapplion can you add ${org || 'our org'} to Review Royale? 👑\n\nhttps://review-royale.fly.dev`;
-            return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-        }
-
-        function requestAccess(org) {
-            window.open(getTweetUrl(org), '_blank');
-        }
+        // getTweetUrl removed (self-hosted deployment)
+        function getTweetUrl(org) { return '#'; }
 
         // Sync progress bar functions
         function showSyncProgress(status) {
@@ -454,6 +447,12 @@
             if (path === "/global" || path === "/global/") {
                 return { type: "global", user: hash.startsWith("#user/") ? hash.replace("#user/", "") : null };
             }
+            // Check for /user/:username pattern (global user profile)
+            const globalUserMatch = path.match(/^\/user\/([^\/]+)\/?$/);
+            if (globalUserMatch) {
+                return { type: 'global-user', user: globalUserMatch[1] };
+            }
+            
             // Check for /:org/:repo/user/:username pattern (repo-scoped user profile)
             const repoUserMatch = path.match(/^\/([^\/]+)\/([^\/]+)\/user\/([^\/]+)\/?$/);
             if (repoUserMatch) {
@@ -510,7 +509,7 @@
             if (currentRepo) {
                 return `/${currentRepo.owner}/${currentRepo.name}/user/${username}`;
             }
-            return `/#user/${username}`;
+            return `/user/${username}`;
         }
 
         function isOrgAllowed(org) {
@@ -947,19 +946,47 @@
                 document.getElementById('profile-comments').textContent = stats.comments_written || 0;
                 document.getElementById('profile-prs').textContent = stats.prs_authored || 0;
 
-                // XP Breakdown (estimated based on current formula)
-                const reviewBaseXP = (stats.prs_reviewed || 0) * 10;
-                const commentXP = (stats.comments_written || 0) * 5;
-                const estimatedTotal = reviewBaseXP + commentXP;
-                const bonusXP = periodXp - estimatedTotal;
+                // XP Breakdown using real category data
                 const breakdown = document.getElementById('xp-breakdown');
-                breakdown.innerHTML = `
-                    <div class="flex justify-between"><span class="text-gray-400">📝 PRs reviewed (${stats.prs_reviewed || 0} × 10)</span><span class="text-white">+${formatNumber(reviewBaseXP)} XP</span></div>
-                    <div class="flex justify-between"><span class="text-gray-400">💬 Comments (${stats.comments_written || 0} × 5)</span><span class="text-white">+${formatNumber(commentXP)} XP</span></div>
-                    ${bonusXP > 0 ? `<div class="flex justify-between"><span class="text-gray-400">⚡ Speed & depth bonuses</span><span class="text-white">+${formatNumber(bonusXP)} XP</span></div>` : ''}
-                    <div class="flex justify-between border-t border-white/10 pt-2 mt-2 font-bold"><span>Total</span><span class="text-purple-400">${formatNumber(periodXp)} XP</span></div>
-                    <div class="text-xs text-gray-600 mt-2">Bonuses: Fast (<1h) +10, Thorough (>5 comments) +5, Deep (>10) +10</div>
-                `;
+                const sessionBaseXP = (stats.sessions || stats.prs_reviewed || 0) * 10;
+                
+                try {
+                    const catResponse = await fetch(`${getUserApiBase(username)}/categories`);
+                    if (catResponse.ok) {
+                        const cats = await catResponse.json();
+                        let commentXP = 0;
+                        const catLines = cats.map(d => {
+                            const cfg = categoryConfig[d.category] || categoryConfig.other;
+                            // Estimate per-comment XP from avg quality
+                            let base = d.avg_quality >= 7 ? 8 : d.avg_quality >= 4 ? 5 : 2;
+                            let bonus = (d.category === 'logic' || d.category === 'critical') ? 3 : d.category === 'structural' ? 2 : 0;
+                            let catXP = d.count * (base + bonus);
+                            commentXP += catXP;
+                            return `<div class="flex justify-between"><span class="text-gray-400">${cfg.icon} ${cfg.label} (${d.count} × ${base}${bonus ? `+${bonus}` : ''})</span><span class="text-white">+${formatNumber(catXP)} XP</span></div>`;
+                        }).join('');
+                        
+                        const bonusXP = Math.max(0, periodXp - sessionBaseXP - commentXP);
+                        breakdown.innerHTML = `
+                            <div class="flex justify-between"><span class="text-gray-400">📝 Review sessions (${stats.sessions || stats.prs_reviewed || 0} × 10)</span><span class="text-white">+${formatNumber(sessionBaseXP)} XP</span></div>
+                            <div class="mt-2 mb-1 text-xs text-gray-500 uppercase tracking-wider">Comment XP by category</div>
+                            ${catLines}
+                            ${bonusXP > 0 ? `<div class="flex justify-between mt-2"><span class="text-gray-400">⚡ Speed & depth bonuses</span><span class="text-white">+${formatNumber(bonusXP)} XP</span></div>` : ''}
+                            <div class="flex justify-between border-t border-white/10 pt-2 mt-2 font-bold"><span>Total</span><span class="text-purple-400">${formatNumber(periodXp)} XP</span></div>
+                        `;
+                    } else {
+                        throw new Error('no categories');
+                    }
+                } catch (e) {
+                    // Fallback to simple breakdown
+                    const commentXP = (stats.comments_written || 0) * 5;
+                    const bonusXP = Math.max(0, periodXp - sessionBaseXP - commentXP);
+                    breakdown.innerHTML = `
+                        <div class="flex justify-between"><span class="text-gray-400">📝 Review sessions (${stats.sessions || stats.prs_reviewed || 0} × 10)</span><span class="text-white">+${formatNumber(sessionBaseXP)} XP</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">💬 Comments (${stats.comments_written || 0} × ~5 avg)</span><span class="text-white">+${formatNumber(commentXP)} XP</span></div>
+                        ${bonusXP > 0 ? `<div class="flex justify-between"><span class="text-gray-400">⚡ Speed & depth bonuses</span><span class="text-white">+${formatNumber(bonusXP)} XP</span></div>` : ''}
+                        <div class="flex justify-between border-t border-white/10 pt-2 mt-2 font-bold"><span>Total</span><span class="text-purple-400">${formatNumber(periodXp)} XP</span></div>
+                    `;
+                }
 
                 // Display achievements with progress
                 const achievements = data.achievements || [];
@@ -1146,6 +1173,18 @@
         window.onpopstate = async () => {
             const urlInfo = parseUrl();
             
+            // Global user profile
+            if (urlInfo.type === 'global-user') {
+                if (currentRepo) {
+                    currentRepo = null;
+                    updateSubtitle();
+                    renderRepoNav();
+                    await loadLeaderboard(currentPeriod);
+                }
+                showProfile(urlInfo.user);
+                return;
+            }
+            
             // Update repo context if changed
             if (urlInfo.type === 'repo' || urlInfo.type === 'repo-user') {
                 if (!currentRepo || currentRepo.owner !== urlInfo.owner || currentRepo.name !== urlInfo.name) {
@@ -1163,7 +1202,7 @@
             } else if (currentRepo) {
                 currentRepo = null;
                 updateSubtitle();
-                renderRepoSelector();
+                renderRepoNav();
                 await loadLeaderboard(currentPeriod);
             }
             
@@ -1425,15 +1464,15 @@
         }
 
         const categoryConfig = {
-            logic: { icon: '🐛', color: 'text-red-400', bg: 'bg-red-400/10', label: 'Logic / Bug Catches' },
-            structural: { icon: '🏗️', color: 'text-blue-400', bg: 'bg-blue-400/10', label: 'Structural / Design' },
-            nit: { icon: '✏️', color: 'text-yellow-400', bg: 'bg-yellow-400/10', label: 'Nits' },
-            question: { icon: '❓', color: 'text-purple-400', bg: 'bg-purple-400/10', label: 'Questions' },
-            cosmetic: { icon: '🎨', color: 'text-pink-400', bg: 'bg-pink-400/10', label: 'Cosmetic' },
-            critical: { icon: '🚨', color: 'text-red-500', bg: 'bg-red-500/10', label: 'Critical' },
-            performance: { icon: '⚡', color: 'text-orange-400', bg: 'bg-orange-400/10', label: 'Performance' },
-            security: { icon: '🔒', color: 'text-green-400', bg: 'bg-green-400/10', label: 'Security' },
-            other: { icon: '📝', color: 'text-gray-400', bg: 'bg-gray-400/10', label: 'Other' },
+            logic: { icon: '🐛', color: 'text-red-400', bg: 'bg-red-400/40', label: 'Logic / Bug Catches' },
+            structural: { icon: '🏗️', color: 'text-blue-400', bg: 'bg-blue-400/40', label: 'Structural / Design' },
+            nit: { icon: '✏️', color: 'text-yellow-400', bg: 'bg-yellow-400/40', label: 'Nits' },
+            question: { icon: '❓', color: 'text-purple-400', bg: 'bg-purple-400/40', label: 'Questions' },
+            cosmetic: { icon: '🎨', color: 'text-pink-400', bg: 'bg-pink-400/40', label: 'Cosmetic' },
+            critical: { icon: '🚨', color: 'text-red-500', bg: 'bg-red-500/40', label: 'Critical' },
+            performance: { icon: '⚡', color: 'text-orange-400', bg: 'bg-orange-400/40', label: 'Performance' },
+            security: { icon: '🔒', color: 'text-green-400', bg: 'bg-green-400/40', label: 'Security' },
+            other: { icon: '📝', color: 'text-gray-400', bg: 'bg-gray-400/40', label: 'Other' },
         };
 
         async function loadCategoryBreakdown(username) {
@@ -1451,7 +1490,7 @@
                 const total = data.reduce((s, d) => s + d.count, 0);
                 
                 // Stacked bar
-                const barHtml = `<div class="flex rounded-full overflow-hidden h-4 mb-4">${data.map(d => {
+                const barHtml = `<div class="flex rounded-full overflow-hidden h-5 mb-4">${data.map(d => {
                     const cfg = categoryConfig[d.category] || categoryConfig.other;
                     const width = (d.count / total * 100).toFixed(1);
                     return `<div class="${cfg.bg} border-r border-black/20" style="width:${width}%" title="${cfg.label}: ${d.count} (${width}%)"></div>`;
@@ -1487,6 +1526,18 @@
             // Parse URL to determine context
             const urlInfo = parseUrl();
             
+            // Global user profile (/user/:username)
+            if (urlInfo.type === 'global-user') {
+                currentRepo = null;
+                hideLanding();
+                updateSubtitle();
+                renderRepoNav();
+                await loadLeaderboard(currentPeriod);
+                showProfile(urlInfo.user);
+                loadDataInfo();
+                return;
+            }
+            
             // Root URL (/) and /global both show global leaderboard
             if (urlInfo.type === 'global' || 
                 (urlInfo.type === 'leaderboard' && !urlInfo.user && window.location.pathname === '/')) {
@@ -1495,10 +1546,10 @@
                 updateSubtitle();
                 renderRepoNav();
                 if (urlInfo.user) {
-                    await loadLeaderboard('month');
+                    await loadLeaderboard(currentPeriod);
                     showProfile(urlInfo.user);
                 } else {
-                    await loadLeaderboard('month');
+                    await loadLeaderboard(currentPeriod);
                 }
                 loadDataInfo();
                 return;
@@ -1521,10 +1572,10 @@
             }
             
             if (urlInfo.user) {
-                await loadLeaderboard('month');
+                await loadLeaderboard(currentPeriod);
                 showProfile(urlInfo.user);
             } else {
-                await loadLeaderboard('month');
+                await loadLeaderboard(currentPeriod);
             }
             loadDataInfo();
             
