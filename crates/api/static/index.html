@@ -607,7 +607,7 @@
                                     <span class="font-semibold text-white user-login text-sm md:text-base truncate" title="${user.login}">${user.login}</span>
                                     <span class="md:hidden inline-flex items-center px-1.5 py-0.5 rounded bg-gradient-to-r ${levelColor} text-[10px] font-bold flex-shrink-0">${user.level}</span>
                                 </div>
-                                <div class="text-xs text-gray-500">${stats.prs_reviewed || 0} PR${(stats.prs_reviewed || 0) === 1 ? '' : 's'} reviewed</div>
+                                <div class="text-xs text-gray-500">${stats.prs_reviewed || 0} PR${(stats.prs_reviewed || 0) === 1 ? '' : 's'} reviewed${entry.last_review_at ? ` · ${getRelativeTime(new Date(entry.last_review_at))}` : ''}</div>
                             </div>
                         </div>
                         <div class="col-span-2 text-center hidden md:block">
@@ -951,7 +951,7 @@
                 const sessionBaseXP = (stats.sessions || stats.prs_reviewed || 0) * 10;
                 
                 try {
-                    const catResponse = await fetch(`${getUserApiBase(username)}/categories`);
+                    const catResponse = await fetch(`${getUserApiBase(username)}/categories?period=${currentProfilePeriod}`);
                     if (catResponse.ok) {
                         const cats = await catResponse.json();
                         let commentXP = 0;
@@ -1005,7 +1005,7 @@
 
         async function loadActivityChart(username) {
             try {
-                loadCategoryBreakdown(username);
+                loadCategoryBreakdown(username, currentProfilePeriod);
                 const response = await fetch(`${getUserApiBase(username)}/activity`);
                 let labels = [], reviewData = [], xpData = [];
                 
@@ -1227,11 +1227,9 @@
             body.innerHTML = `
                 <div class="px-6 py-16 text-center">
                     <div class="text-6xl mb-4">🔒</div>
-                    <h3 class="text-xl font-semibold text-gray-300 mb-2">Access Restricted</h3>
-                    <p class="text-gray-500 mb-4">The <strong>${org}</strong> organization is not publicly accessible yet.</p>
-                    <a href="${getTweetUrl(org)}" target="_blank" class="inline-block mt-4 px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold transition-colors">🐦 Request Access on Twitter</a>
-                    <br>
-                    <button onclick="window.location.href='/'" class="mt-4 px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors text-gray-400">Back to Home</button>
+                    <h3 class="text-xl font-semibold text-gray-300 mb-2">Repository Not Tracked</h3>
+                    <p class="text-gray-500 mb-6">The <strong>${org}</strong> organization is not currently tracked on this instance.</p>
+                    <button onclick="window.location.href='/'" class="px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors text-gray-300">Back to Leaderboard</button>
                 </div>
             `;
         }
@@ -1475,10 +1473,11 @@
             other: { icon: '📝', color: 'text-gray-400', bg: 'bg-gray-400/40', label: 'Other' },
         };
 
-        async function loadCategoryBreakdown(username) {
+        async function loadCategoryBreakdown(username, period) {
             const container = document.getElementById('categories-breakdown');
             try {
-                const response = await fetch(`${getUserApiBase(username)}/categories`);
+                const periodParam = period ? `?period=${period}` : '';
+                const response = await fetch(`${getUserApiBase(username)}/categories${periodParam}`);
                 if (!response.ok) throw new Error('Failed');
                 const data = await response.json();
                 

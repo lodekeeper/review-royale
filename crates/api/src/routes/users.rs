@@ -290,13 +290,16 @@ pub async fn repo_reviews(
 pub async fn category_breakdown(
     State(state): State<Arc<AppState>>,
     Path(username): Path<String>,
+    Query(query): Query<StatsQuery>,
 ) -> ApiResult<Json<Vec<db::users::CategoryBreakdown>>> {
     let user = db::users::get_by_login(&state.pool, &username)
         .await
         .db_err()?
         .not_found(format!("User '{}' not found", username))?;
 
-    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, None)
+    let since = period_to_since(&query.period);
+    let since_opt = if query.period == "all" { None } else { Some(since) };
+    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, None, since_opt)
         .await
         .db_err()?;
 
@@ -307,6 +310,7 @@ pub async fn category_breakdown(
 pub async fn repo_category_breakdown(
     State(state): State<Arc<AppState>>,
     Path((owner, name, username)): Path<(String, String, String)>,
+    Query(query): Query<StatsQuery>,
 ) -> ApiResult<Json<Vec<db::users::CategoryBreakdown>>> {
     let repo = db::repos::get_by_name(&state.pool, &owner, &name)
         .await
@@ -318,7 +322,9 @@ pub async fn repo_category_breakdown(
         .db_err()?
         .not_found(format!("User '{}' not found", username))?;
 
-    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, Some(repo.id))
+    let since = period_to_since(&query.period);
+    let since_opt = if query.period == "all" { None } else { Some(since) };
+    let breakdown = db::users::get_category_breakdown(&state.pool, user.id, Some(repo.id), since_opt)
         .await
         .db_err()?;
 

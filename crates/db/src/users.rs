@@ -339,6 +339,7 @@ pub async fn get_category_breakdown(
     pool: &PgPool,
     user_id: Uuid,
     repo_id: Option<Uuid>,
+    since: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Result<Vec<CategoryBreakdown>, sqlx::Error> {
     let rows = sqlx::query(
         r#"
@@ -349,6 +350,7 @@ pub async fn get_category_breakdown(
             WHERE rc.user_id = $1
               AND rc.category IS NOT NULL
               AND ($2::uuid IS NULL OR pr.repo_id = $2)
+              AND ($3::timestamptz IS NULL OR rc.created_at >= $3)
         ),
         total AS (
             SELECT COUNT(*) as total_count FROM user_comments
@@ -365,6 +367,7 @@ pub async fn get_category_breakdown(
     )
     .bind(user_id)
     .bind(repo_id)
+    .bind(since)
     .fetch_all(pool)
     .await?;
 
