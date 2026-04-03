@@ -748,31 +748,38 @@
         let openPrsSort = 'age-desc';
 
         async function showOpenPrs() {
-            if (!currentRepo) {
-                alert('Please select a repository first');
-                return;
-            }
-            
             document.getElementById('leaderboard-view').classList.add('hidden');
             document.getElementById('profile-view').classList.add('hidden');
             document.getElementById('open-prs-view').classList.remove('hidden');
             
             document.getElementById('back-from-prs-text').textContent = 
-                `Back to ${currentRepo.owner}/${currentRepo.name}`;
+                currentRepo ? `Back to ${currentRepo.owner}/${currentRepo.name}` : 'Back to Global Leaderboard';
             document.getElementById('open-prs-subtitle').textContent = 
-                `${currentRepo.owner}/${currentRepo.name}`;
+                currentRepo ? `${currentRepo.owner}/${currentRepo.name}` : 'All repositories';
 
             try {
-                const response = await fetch(`/api/repos/${currentRepo.owner}/${currentRepo.name}/open-prs`);
-                if (!response.ok) throw new Error('Failed to load PRs');
-                const data = await response.json();
+                let allPrs = [];
+                let totalNeedsReview = 0, totalApproved = 0, totalChanges = 0;
+                
+                const repos = currentRepo ? [currentRepo] : availableRepos;
+                for (const repo of repos) {
+                    const response = await fetch(`/api/repos/${repo.owner}/${repo.name}/open-prs`);
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    totalNeedsReview += data.needs_review;
+                    totalApproved += data.approved;
+                    totalChanges += data.changes_requested;
+                    // Tag each PR with repo info for display
+                    data.prs.forEach(pr => { pr._repo = `${repo.owner}/${repo.name}`; });
+                    allPrs = allPrs.concat(data.prs);
+                }
 
-                document.getElementById('prs-total').textContent = data.total;
-                document.getElementById('prs-needs-review').textContent = data.needs_review;
-                document.getElementById('prs-approved').textContent = data.approved;
-                document.getElementById('prs-changes').textContent = data.changes_requested;
+                document.getElementById('prs-total').textContent = allPrs.length;
+                document.getElementById('prs-needs-review').textContent = totalNeedsReview;
+                document.getElementById('prs-approved').textContent = totalApproved;
+                document.getElementById('prs-changes').textContent = totalChanges;
 
-                openPrsData = data.prs;
+                openPrsData = allPrs;
                 renderOpenPrs();
             } catch (e) {
                 console.error('Failed to load open PRs:', e);
@@ -856,7 +863,7 @@
                         <div class="col-span-1 text-center text-gray-500">#${pr.number}</div>
                         <div class="col-span-5">
                             <div class="font-medium text-white truncate">${pr.title}</div>
-                            <div class="text-xs text-gray-500">by ${pr.author}</div>
+                            <div class="text-xs text-gray-500">by ${pr.author}${pr._repo ? ` · <span class="text-purple-400">${pr._repo}</span>` : ''}</div>
                         </div>
                         <div class="col-span-2 text-center">
                             <span class="px-2 py-1 rounded text-xs ${statusClass}">${statusLabel}</span>
@@ -869,12 +876,16 @@
         }
 
         async function loadOpenPrsCount() {
-            if (!currentRepo) return;
             try {
-                const response = await fetch(`/api/repos/${currentRepo.owner}/${currentRepo.name}/open-prs`);
-                if (!response.ok) return;
-                const data = await response.json();
-                document.getElementById('stat-open-prs').textContent = data.total;
+                const repos = currentRepo ? [currentRepo] : availableRepos;
+                let total = 0;
+                for (const repo of repos) {
+                    const response = await fetch(`/api/repos/${repo.owner}/${repo.name}/open-prs`);
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    total += data.total;
+                }
+                document.getElementById('stat-open-prs').textContent = total;
             } catch (e) {
                 console.error('Failed to load open PRs count:', e);
             }
@@ -908,7 +919,7 @@
             const backText = document.getElementById('back-button-text');
             backText.textContent = currentRepo 
                 ? `Back to ${currentRepo.owner}/${currentRepo.name}` 
-                : 'Back to Leaderboard';
+                : (window.location.pathname.startsWith('/global') ? 'Back to Global Leaderboard' : 'Back to Leaderboard');
 
             // Find user in leaderboard data first
             const entry = leaderboardData.find(e => e.user.login === username);
