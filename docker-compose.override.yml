@@ -1,0 +1,38 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3456:3000"
+    depends_on:
+      rr-postgres:
+        condition: service_healthy
+      rr-redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@rr-postgres:5432/review_royale
+      REDIS_URL: redis://rr-redis:6379
+      HOST: 0.0.0.0
+      PORT: "3000"
+      RUST_LOG: info,review_royale=debug
+      SYNC_INTERVAL_HOURS: "6"
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=charon_dvnode
+      - traefik.http.routers.review-royale.service=review-royale
+      - traefik.http.routers.review-royale.entrypoints=websecure
+      - traefik.http.routers.review-royale.rule=Host(`review-royale.nflaig.dev`)
+      - traefik.http.routers.review-royale.tls.certresolver=letsencrypt
+      - traefik.http.services.review-royale.loadbalancer.server.port=3000
+    networks:
+      - dvnode
+      - default
+
+networks:
+  dvnode:
+    name: charon_dvnode
+    external: true
