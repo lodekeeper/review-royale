@@ -122,7 +122,7 @@ pub async fn recalculate_all_xp(pool: &PgPool) -> Result<RecalculationStats, sql
             .await;
     }
 
-    // Step 6: Check and unlock achievements for all participating users
+    // Step 6: Check achievements and award achievement XP for all participating users
     let participant_ids = sqlx::query_scalar::<_, Uuid>(
         r#"
         SELECT DISTINCT user_id
@@ -139,12 +139,31 @@ pub async fn recalculate_all_xp(pool: &PgPool) -> Result<RecalculationStats, sql
     info!("Checking achievements for {} users", participant_ids.len());
     let checker = crate::achievements::AchievementChecker::new(pool.clone());
     let mut total_achievements = 0;
+
+    // Cache achievement definitions for XP lookup
+    let all_achievements = db::achievements::list_all(pool).await?;
+    let achievement_xp: std::collections::HashMap<String, i32> = all_achievements
+        .iter()
+        .map(|a| (a.id.clone(), a.xp_reward))
+        .collect();
+
     for user_id in &participant_ids {
+        // Check and unlock new achievements (awards XP for newly unlocked)
         if let Ok(unlocked) = checker.check_user(user_id).await {
             total_achievements += unlocked.len();
         }
+        // Credit XP for all unlocked achievements (needed after XP reset in step 1)
+        if let Ok(existing) = db::achievements::list_for_user(pool, *user_id).await {
+            for ua in &existing {
+                let xp = achievement_xp.get(&ua.achievement_id).copied().unwrap_or(0);
+                if xp > 0 {
+                    let _ = db::users::add_xp(pool, *user_id, xp as i64).await;
+                    total_xp_awarded += xp as i64;
+                }
+            }
+        }
     }
-    info!("Unlocked {} achievements", total_achievements);
+    info!("Unlocked {} new achievements", total_achievements);
 
     info!(
         "Recalculation complete: {} sessions, {} XP awarded, {} users updated, {} achievements",

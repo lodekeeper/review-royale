@@ -369,13 +369,19 @@ struct ProgressStats {
     prs_merged: i64,
 }
 
+/// Achievement IDs hidden from the UI (placeholder, no real signal yet)
+const HIDDEN_ACHIEVEMENTS: &[&str] = &["helpful"];
+
 /// Get a user's progress toward all achievements
 pub async fn get_user_progress(
     pool: &PgPool,
     user_id: Uuid,
 ) -> Result<Vec<AchievementProgress>, sqlx::Error> {
-    // Get all achievements
-    let achievements = list_all(pool).await?;
+    // Get all achievements (excluding hidden ones)
+    let achievements: Vec<_> = list_all(pool).await?
+        .into_iter()
+        .filter(|a| !HIDDEN_ACHIEVEMENTS.contains(&a.id.as_str()))
+        .collect();
 
     // Get user's unlocked achievements
     let unlocked: std::collections::HashSet<String> = list_for_user(pool, user_id)
@@ -489,7 +495,6 @@ async fn get_progress_values(
         "comeback_kid" => (stats.comebacks.min(1), 1),
         "review_rampage" => (stats.max_reviews_in_day.min(5), 5),
         "the_closer" => (stats.closing_approvals.min(10), 10),
-        "helpful" => (0, 10),
         _ => (0, 1),
     };
 

@@ -26,7 +26,7 @@ impl AchievementChecker {
                 continue;
             }
 
-            if self.try_unlock(user_id, &achievement.achievement_id).await? {
+            if self.try_unlock(user_id, &achievement.achievement_id, achievement.xp_reward).await? {
                 unlocked.push(achievement.achievement_id);
             }
         }
@@ -49,6 +49,7 @@ impl AchievementChecker {
         &self,
         user_id: &Uuid,
         achievement_id: &str,
+        xp_reward: i32,
     ) -> Result<bool, common::Error> {
         // Check if already has it
         let has = db::achievements::has_achievement(&self.pool, *user_id, achievement_id)
@@ -64,10 +65,22 @@ impl AchievementChecker {
             .await
             .map_err(|e| common::Error::Database(e.to_string()))?;
 
-        info!(
-            "🏆 Achievement unlocked: {} for user {:?}",
-            achievement_id, user_id
-        );
+        // Award the achievement's XP reward
+        if xp_reward > 0 {
+            db::users::add_xp(&self.pool, *user_id, xp_reward as i64)
+                .await
+                .map_err(|e| common::Error::Database(e.to_string()))?;
+            info!(
+                "🏆 Achievement unlocked: {} for user {:?} (+{} XP)",
+                achievement_id, user_id, xp_reward
+            );
+        } else {
+            info!(
+                "🏆 Achievement unlocked: {} for user {:?}",
+                achievement_id, user_id
+            );
+        }
+
         Ok(true)
     }
 }

@@ -179,7 +179,6 @@ Level = floor(sqrt(XP / 100)) + 1
 | `comeback_kid` | Comeback Kid | Return after 30+ day absence | 150 | Uncommon |
 | `review_rampage` | Review Rampage | Review 5 PRs in a single day | 200 | Uncommon |
 | `the_closer` | The Closer | Your approval led to 10 merges | 350 | Rare |
-| `helpful` | Helpful | Get 10 "thanks" replies to comments | 200 | Uncommon |
 
 ## Deployment
 
