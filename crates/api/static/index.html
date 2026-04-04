@@ -930,8 +930,11 @@
 
                 document.getElementById('profile-avatar').src = user.avatar_url || `https://github.com/${user.login}.png`;
                 document.getElementById('profile-name').textContent = user.login;
-                // Show total XP (reviews + achievements) as the headline number
-                document.getElementById('profile-xp').textContent = formatNumber(user.xp || 0);
+                // Period-specific review XP for breakdown calculations
+                const periodXp = stats.period_xp || 0;
+                // Headline XP: total (reviews + achievements) for "all", period review XP otherwise
+                const headlineXp = currentProfilePeriod === 'all' ? (user.xp || 0) : periodXp;
+                document.getElementById('profile-xp').textContent = formatNumber(headlineXp);
                 document.getElementById('profile-rank').textContent = `Rank #${rank}`;
                 
                 const levelColor = getLevelColor(user.level);
