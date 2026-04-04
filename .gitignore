@@ -30,3 +30,7 @@ build/
 # Package files
 package.json
 package-lock.json
+
+# Workspace files (not part of the project)
+BACKLOG.md
+PLAN.md
