@@ -616,7 +616,7 @@
                             </div>
                         </div>
                         <div class="col-span-3 md:col-span-2 text-right">
-                            <div class="font-bold text-lg md:text-xl bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">${formatNumber(currentPeriod === "all" ? entry.user.xp : entry.score)}</div>
+                            <div class="font-bold text-lg md:text-xl bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">${formatNumber(entry.score)}</div>
                             <div class="text-[10px] text-gray-500">XP</div>
                         </div>
                         <div class="col-span-3 text-right hidden md:block">
@@ -930,11 +930,8 @@
 
                 document.getElementById('profile-avatar').src = user.avatar_url || `https://github.com/${user.login}.png`;
                 document.getElementById('profile-name').textContent = user.login;
-                // Period-specific review XP for breakdown calculations
                 const periodXp = stats.period_xp || 0;
-                // Headline XP: total (reviews + achievements) for "all", period review XP otherwise
-                const headlineXp = currentProfilePeriod === 'all' ? (user.xp || 0) : periodXp;
-                document.getElementById('profile-xp').textContent = formatNumber(headlineXp);
+                document.getElementById('profile-xp').textContent = formatNumber(periodXp);
                 document.getElementById('profile-rank').textContent = `Rank #${rank}`;
                 
                 const levelColor = getLevelColor(user.level);
