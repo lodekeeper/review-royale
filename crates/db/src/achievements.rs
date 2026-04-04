@@ -340,6 +340,7 @@ pub struct AchievementProgress {
     pub name: String,
     pub emoji: String,
     pub description: String,
+    #[serde(skip_serializing)]
     pub xp_reward: i32,
     pub rarity: AchievementRarity,
     pub category: AchievementCategory,
